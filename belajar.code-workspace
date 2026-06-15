@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../../belajar"
+		},
+		{
+			"name": "simulasi-ecolight",
+			"path": "."
+		},
+		{
+			"path": "../../../../../../ecolight-server"
+		}
+	],
+	"settings": {}
+}
