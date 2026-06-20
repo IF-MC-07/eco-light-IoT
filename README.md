@@ -26,10 +26,11 @@ ECOLIGHT-IOT/
 ├── LICENSE
 └── .gitignore
 
-text## 🛠️ Hardware yang Digunakan
+🛠️ Hardware yang Digunakan
 - ESP32 DevKit V1
 - 4 Channel Relay Module (Active LOW)
 - PZEM-004T v3.0
+- Modul Sensor Ldr
 - Kamera (dikelola oleh AI Server)
 
 ## 🔌 Wiring / Pinout
@@ -62,8 +63,9 @@ text## 🛠️ Hardware yang Digunakan
 ```json
 {"zone": 1, "state": true}
 {"zone": 4, "command": "off"}
-👥 Tim Pengembang
 
+
+👥 Tim Pengembang
 IoT & Hardware : Ruth Yohana Manurung (3312411032)
 AI, Web & Backend : Ridho Putrawan (3312411050)
 
