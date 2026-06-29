@@ -2,34 +2,71 @@
 #define RELAY_CONTROL_H
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include "config.h"
 
-void initRelays() {
-  pinMode(RELAY1_PIN, OUTPUT);
-  pinMode(RELAY2_PIN, OUTPUT);
-  pinMode(RELAY3_PIN, OUTPUT);
-  pinMode(RELAY4_PIN, OUTPUT);
-  
-  digitalWrite(RELAY1_PIN, HIGH); // Active LOW
-  digitalWrite(RELAY2_PIN, HIGH);
-  digitalWrite(RELAY3_PIN, HIGH);
-  digitalWrite(RELAY4_PIN, HIGH);
-  
-  Serial.println("[RELAY] Semua relay diinisialisasi (OFF)");
+inline void initRelays() {
+    pinMode(RELAY_CH1_PIN, OUTPUT);
+    pinMode(RELAY_CH2_PIN, OUTPUT);
+    pinMode(RELAY_CH3_PIN, OUTPUT);
+    pinMode(RELAY_CH4_PIN, OUTPUT);
+    
+    // Active LOW: set HIGH to turn OFF initially
+    digitalWrite(RELAY_CH1_PIN, HIGH);
+    digitalWrite(RELAY_CH2_PIN, HIGH);
+    digitalWrite(RELAY_CH3_PIN, HIGH);
+    digitalWrite(RELAY_CH4_PIN, HIGH);
 }
 
-void controlRelay(int zone, bool state) {
-  int pin;
-  switch(zone) {
-    case 1: pin = RELAY1_PIN; break;
-    case 2: pin = RELAY2_PIN; break;
-    case 3: pin = RELAY3_PIN; break;
-    case 4: pin = RELAY4_PIN; break;
-    default: Serial.println("[RELAY] Zone tidak valid!"); return;
-  }
-  
-  digitalWrite(pin, state ? LOW : HIGH);
-  Serial.printf("[RELAY] Zone %d → %s\n", zone, state ? "ON" : "OFF");
+inline void setRelay(int channel, bool state) {
+    // state = true for ON (LOW), false for OFF (HIGH)
+    int pin = -1;
+    switch(channel) {
+        case 1: pin = RELAY_CH1_PIN; break;
+        case 2: pin = RELAY_CH2_PIN; break;
+        case 3: pin = RELAY_CH3_PIN; break;
+        case 4: pin = RELAY_CH4_PIN; break;
+        default: return; // Invalid channel
+    }
+    
+    if (state) {
+        digitalWrite(pin, LOW);
+    } else {
+        digitalWrite(pin, HIGH);
+    }
 }
 
-#endif
+inline bool getRelayStatus(int channel) {
+    int pin = -1;
+    switch(channel) {
+        case 1: pin = RELAY_CH1_PIN; break;
+        case 2: pin = RELAY_CH2_PIN; break;
+        case 3: pin = RELAY_CH3_PIN; break;
+        case 4: pin = RELAY_CH4_PIN; break;
+        default: return false; // Invalid channel
+    }
+    // Active LOW: return true if LOW
+    return (digitalRead(pin) == LOW);
+}
+
+inline String buildStatusPayload() {
+    StaticJsonDocument<512> doc;
+    doc["room_id"] = ROOM_ID;
+    
+    JsonArray lights = doc.createNestedArray("lights");
+    
+    for (int i = 1; i <= 4; i++) {
+        JsonObject light = lights.createNestedObject();
+        light["relay_channel"] = i;
+        light["status"] = getRelayStatus(i) ? "on" : "off";
+    }
+    
+    doc["ac_status"] = "off";
+    doc["temperature"] = (char*)NULL; // null in JSON
+    
+    String payload;
+    serializeJson(doc, payload);
+    return payload;
+}
+
+#endif // RELAY_CONTROL_H

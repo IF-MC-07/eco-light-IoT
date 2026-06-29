@@ -1,36 +1,41 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// ================================================
-// CONFIG ECO-LIGHT IOT - Polibatam 2026
-// ================================================
+// --- WiFi Settings ---
+#define WIFI_SSID "Sherina"
+#define WIFI_PASS "16november2003"
+#define WIFI_TIMEOUT_MS 15000
 
-// WiFi
-#define WIFI_SSID           "Sherina"               // GANTI SESUAI JARINGAN KAMU
-#define WIFI_PASSWORD       "16november2003"        // GANTI!
+// --- MQTT Settings ---
+#define MQTT_BROKER "192.168.1.7"
+#define MQTT_PORT 1883
 
-// MQTT
-#define MQTT_BROKER         "192.168.1.2"           // GANTI IP Laptop/Server AI
-#define MQTT_PORT           1883
-#define MQTT_CLIENT_ID      "ESP32_EcoLight_Ruth_01"
+#define ROOM_ID "ROM-1464452b"
 
-// MQTT Topics
-#define TOPIC_CONTROL       "ecolight/zone/control"
-#define TOPIC_ENERGY        "ecolight/energy/data"
-#define TOPIC_STATUS        "ecolight/device/status"
+// --- MQTT Topics ---
+#define TOPIC_SUBSCRIBE_LIGHT "devices/" ROOM_ID "/light/+"
+#define TOPIC_SUBSCRIBE_STATUS "devices/" ROOM_ID "/status/request"
+#define TOPIC_PUBLISH_ONLINE "devices/" ROOM_ID "/status/online"
+#define TOPIC_PUBLISH_STATUS "devices/" ROOM_ID "/status/response"
+#define TOPIC_PUBLISH_ENERGY "devices/" ROOM_ID "/energy"
 
-// Pin Definitions
-#define RELAY1_PIN  25
-#define RELAY2_PIN  26
-#define RELAY3_PIN  27
-#define RELAY4_PIN  33
+// --- Hardware Pins ---
+// Relays (Active LOW)
+#define RELAY_CH1_PIN 25 // Zone A
+#define RELAY_CH2_PIN 26 // Zone B
+#define RELAY_CH3_PIN 27 // Zone C
+#define RELAY_CH4_PIN 33 // Zone D
 
-#define PZEM_RX_PIN     16
-#define PZEM_TX_PIN     17
-#define PZEM_BAUD_RATE  9600     // ← Ini yang diperbaiki
+// PZEM-004T (Modbus RTU)
+#define PZEM_RX_PIN 16
+#define PZEM_TX_PIN 17
+#define PZEM_BAUD_RATE 9600
 
-// Timing
-#define INTERVAL_ENERGY     5000
-#define RECONNECT_INTERVAL  5000
+// LDR
+#define LDR_PIN 34
 
-#endif
+// --- Intervals ---
+#define ENERGY_PUBLISH_INTERVAL_MS 5000
+#define MQTT_RECONNECT_INTERVAL_MS 5000
+
+#endif // CONFIG_H

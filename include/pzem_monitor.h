@@ -4,134 +4,84 @@
 #include <Arduino.h>
 #include "config.h"
 
-struct PZEMData {
-  float voltage = 0.0;
-  float current = 0.0;
-  float power = 0.0;
-  float energy = 0.0;
-  float frequency = 0.0;
-  float powerFactor = 0.0;
-  bool valid = false;
-};
+inline void initPZEM() {
+    // PZEM-004T v3 uses Modbus RTU 9600 8N1
+    Serial2.begin(PZEM_BAUD_RATE, SERIAL_8N1, PZEM_RX_PIN, PZEM_TX_PIN);
+}
 
-PZEMData pzemData;
-HardwareSerial pzemSerial(2);
-
-// CRC16
-uint16_t calculateCRC16(uint8_t *buf, uint16_t len) {
-  uint16_t crc = 0xFFFF;
-  for (uint16_t i = 0; i < len; i++) {
-    crc ^= buf[i];
-    for (uint8_t j = 0; j < 8; j++) {
-      crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : (crc >> 1);
+inline uint16_t calculateCRC(uint8_t *data, uint8_t len) {
+    uint16_t crc = 0xFFFF;
+    for (uint8_t pos = 0; pos < len; pos++) {
+        crc ^= (uint16_t)data[pos];
+        for (int i = 8; i != 0; i--) {
+            if ((crc & 0x0001) != 0) {
+                crc >>= 1;
+                crc ^= 0xA001;
+            } else {
+                crc >>= 1;
+            }
+        }
     }
-  }
-  return crc;
+    return crc;
 }
 
-void initPZEM() {
-  Serial.println("[PZEM] Inisialisasi PZEM-004T v3.0...");
-  pzemSerial.begin(PZEM_BAUD_RATE, SERIAL_8N1, PZEM_RX_PIN, PZEM_TX_PIN);
-  delay(2000);                    // Delay lebih lama saat init
-  Serial.println("[PZEM] UART2 siap");
-}
+inline bool readPZEM(float &v, float &i, float &p, float &e, float &f, float &pf) {
+    // Initialize to 0.0 as requested
+    v = 0.0; i = 0.0; p = 0.0; e = 0.0; f = 0.0; pf = 0.0;
 
-// Baca satu register dengan delay lebih aman
-bool readPZEMRegister(uint8_t addr, uint16_t reg, uint16_t len, uint16_t* result) {
-  uint8_t request[8];
-  request[0] = addr;
-  request[1] = 0x03;
-  request[2] = reg >> 8;
-  request[3] = reg & 0xFF;
-  request[4] = len >> 8;
-  request[5] = len & 0xFF;
-
-  uint16_t crc = calculateCRC16(request, 6);
-  request[6] = crc & 0xFF;
-  request[7] = crc >> 8;
-
-  // Bersihkan buffer
-  pzemSerial.flush();
-  while (pzemSerial.available()) pzemSerial.read();
-
-  pzemSerial.write(request, 8);
-  pzemSerial.flush();
-
-  delay(200);   // Delay penting setelah kirim request
-
-  unsigned long timeout = millis() + 1000;
-  uint8_t response[32] = {0};
-  uint8_t idx = 0;
-
-  while (millis() < timeout && idx < 32) {
-    if (pzemSerial.available()) {
-      response[idx++] = pzemSerial.read();
+    // Clear RX buffer
+    while (Serial2.available()) {
+        Serial2.read();
     }
-  }
 
-  if (idx < 5) {
-    Serial.printf("[PZEM] Response pendek (%d bytes)\n", idx);
-    return false;
-  }
+    // Request 10 registers from address 0x0000
+    // Slave addr: 0x01, Func: 0x04, Addr: 0x0000, Count: 0x000A
+    uint8_t request[] = {0x01, 0x04, 0x00, 0x00, 0x00, 0x0A, 0x70, 0x0D};
+    Serial2.write(request, sizeof(request));
+    Serial2.flush();
 
-  if (response[0] != addr || response[1] != 0x03) {
-    Serial.println("[PZEM] Response header salah");
-    return false;
-  }
+    // Wait for response, Modbus RTU max response is usually within a few ms
+    uint32_t startTime = millis();
+    while (Serial2.available() < 25) {
+        if (millis() - startTime > 1000) {
+            return false; // Timeout
+        }
+        delay(10);
+    }
 
-  // Cek CRC
-  uint16_t respCRC = calculateCRC16(response, idx - 2);
-  if ((respCRC & 0xFF) != response[idx-2] || (respCRC >> 8) != response[idx-1]) {
-    Serial.println("[PZEM] CRC Error");
-    return false;
-  }
+    uint8_t response[25];
+    for (int j = 0; j < 25; j++) {
+        response[j] = Serial2.read();
+    }
 
-  for (uint16_t i = 0; i < len; i++) {
-    result[i] = (response[3 + i*2] << 8) | response[4 + i*2];
-  }
-  return true;
+    // Check minimum requirements (Address, Function, Bytes count)
+    if (response[0] != 0x01 || response[1] != 0x04 || response[2] != 0x14) {
+        return false;
+    }
+
+    // Verify CRC
+    uint16_t receivedCRC = response[23] | (response[24] << 8);
+    uint16_t calculatedCRC = calculateCRC(response, 23);
+    if (receivedCRC != calculatedCRC) {
+        return false;
+    }
+
+    // Parse data
+    uint16_t rawVoltage = (response[3] << 8) | response[4];
+    uint32_t rawCurrent = (((uint32_t)response[7] << 8) | response[8]) << 16 | (((uint32_t)response[5] << 8) | response[6]);
+    uint32_t rawPower = (((uint32_t)response[11] << 8) | response[12]) << 16 | (((uint32_t)response[9] << 8) | response[10]);
+    uint32_t rawEnergy = (((uint32_t)response[15] << 8) | response[16]) << 16 | (((uint32_t)response[13] << 8) | response[14]);
+    uint16_t rawFreq = (response[17] << 8) | response[18];
+    uint16_t rawPf = (response[19] << 8) | response[20];
+
+    v = rawVoltage / 10.0f;
+    i = rawCurrent / 1000.0f;
+    p = rawPower / 10.0f;
+    e = rawEnergy;
+    f = rawFreq / 10.0f;
+    pf = rawPf / 100.0f;
+
+    return true;
 }
 
-bool readPZEMData() {
-  uint16_t reg[4];
-  Serial.println("[PZEM] Membaca data...");
-
-  // Baca Voltage saja dulu
-  if (!readPZEMRegister(1, 0x0000, 1, reg)) {
-    Serial.println("[PZEM] ✗ Gagal baca Voltage");
-    pzemData.valid = false;
-    return false;
-  }
-
-  pzemData.voltage = reg[0] / 10.0f;
-  
-  Serial.printf("[PZEM] Voltage = %.1f V\n", pzemData.voltage);
-
-  if (pzemData.voltage > 100.0) {   // Hanya baca data lain kalau tegangan masuk akal
-    readPZEMRegister(1, 0x0001, 1, reg);
-    pzemData.current = reg[0] / 1000.0f;
-
-    readPZEMRegister(1, 0x0002, 2, reg);
-    pzemData.power = ((uint32_t)reg[0] << 16) | reg[1];
-
-    Serial.printf("[PZEM] Power = %.1f W | Current = %.3f A\n", pzemData.power, pzemData.current);
-    pzemData.valid = true;
-  }
-
-  return pzemData.valid;
-}
-
-bool publishPZEMtoMQTT(PubSubClient& mqttClient) {
-  if (!pzemData.valid || !mqttClient.connected()) return false;
-
-  char payload[180];
-  snprintf(payload, sizeof(payload), 
-    "{\"voltage\":%.1f,\"current\":%.3f,\"power\":%.1f,\"energy\":0.0,\"pf\":0.95}", 
-    pzemData.voltage, pzemData.current, pzemData.power);
-
-  bool ok = mqttClient.publish(TOPIC_ENERGY, payload);
-  Serial.printf("[MQTT] %s data energi\n", ok ? "✓ Published" : "✗ Gagal");
-  return ok;
-}
-
-#endif
+#endif // PZEM_MONITOR_H
