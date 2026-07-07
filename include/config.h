@@ -7,7 +7,7 @@
 #define WIFI_TIMEOUT_MS 15000
 
 // --- MQTT Settings ---
-#define MQTT_BROKER "192.168.1.7"
+#define MQTT_BROKER "192.168.1.6"
 #define MQTT_PORT 1883
 
 #define ROOM_ID "ROM-1464452b"
