@@ -58,6 +58,26 @@ int getRelayPin(int channel) {
     }
 }
 
+void publishRelayStatus(int channel, bool state)
+{
+    if (!mqttClient.connected()) return;
+
+    StaticJsonDocument<128> doc;
+
+    doc["room_id"] = ROOM_ID;
+    doc["channel"] = channel;
+    doc["status"] = state ? "on" : "off";
+    doc["timestamp"] = getISO8601Time();
+
+    String payload;
+    serializeJson(doc, payload);
+
+    mqttClient.publish(TOPIC_PUBLISH_RELAY, payload.c_str());
+
+    Serial.print("[MQTT] Relay Status Published -> ");
+    Serial.println(payload);
+}
+
 void on_message(char* topic, byte* payload, unsigned int length) {
     String topicStr = String(topic);
     String payloadStr = "";
@@ -78,6 +98,7 @@ void on_message(char* topic, byte* payload, unsigned int length) {
                 if (command && channel >= 1 && channel <= 4) {
                     bool stateToSet = (String(command) == "on");
                     setRelay(channel, stateToSet);
+                    publishRelayStatus(channel, stateToSet);
                     int pin = getRelayPin(channel);
                     
                     Serial.print("[RELAY] Channel ");

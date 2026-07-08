@@ -18,6 +18,7 @@
 #define TOPIC_PUBLISH_ONLINE "devices/" ROOM_ID "/status/online"
 #define TOPIC_PUBLISH_STATUS "devices/" ROOM_ID "/status/response"
 #define TOPIC_PUBLISH_ENERGY "devices/" ROOM_ID "/energy"
+#define TOPIC_PUBLISH_RELAY "devices/" ROOM_ID "/relay/status"
 
 // --- Hardware Pins ---
 // Relays (Active LOW)
