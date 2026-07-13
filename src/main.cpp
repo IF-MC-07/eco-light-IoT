@@ -96,7 +96,9 @@ void on_message(char* topic, byte* payload, unsigned int length) {
             if (!error) {
                 const char* command = doc["command"];
                 if (command && channel >= 1 && channel <= 4) {
-                    bool stateToSet = (String(command) == "on");
+                    String cmdStr = String(command);
+                    cmdStr.toLowerCase();
+                    bool stateToSet = (cmdStr == "on");
                     setRelay(channel, stateToSet);
                     publishRelayStatus(channel, stateToSet);
                     int pin = getRelayPin(channel);
@@ -168,8 +170,8 @@ void loop() {
     
     if (WiFi.status() != WL_CONNECTED) {
         if (currentMillis - lastWiFiRetry >= MQTT_RECONNECT_INTERVAL_MS) {
-            lastWiFiRetry = currentMillis;
             connectWiFi();
+            lastWiFiRetry = millis();
         }
     } else {
         if (!mqttClient.connected()) {
